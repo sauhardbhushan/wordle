@@ -137,9 +137,9 @@ function App({ targetWord }: AppProps) {
   const getGameEndText = () => {
     if (gameStatus === "won") {
       return (
-        <span className="flex gap-2 align-items-center justify-content-center">
+        <span className="flex align-items-center justify-content-center">
           <Heart fill="red" />
-          <span>Congratulations!! </span>
+          Congratulations!! You've given the faithfuls a real boost!
         </span>
       );
     }
@@ -157,7 +157,9 @@ function App({ targetWord }: AppProps) {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <header className="border-b border-gray-300 py-4">
-        <h1 className="text-4xl font-bold text-center">Wordle</h1>
+        <h1 className="text-4xl font-bold text-center">
+          Wordle (Alice Edition)
+        </h1>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-between py-8 max-w-lg mx-auto w-full px-4">
