@@ -1,34 +1,74 @@
-import { useState, useEffect } from 'react';
-import { Heart} from 'lucide-react';
-import GameBoard from './components/GameBoard';
-import Keyboard from './components/Keyboard';
-import { TARGET_WORD } from './constants';
+import { useState, useEffect } from "react";
+import { Heart, Skull } from "lucide-react";
+import GameBoard from "./components/GameBoard";
+import Keyboard from "./components/Keyboard";
+import { MAX_GUESSES } from "./constants";
+import { encodeWord } from "./puzzles";
 
-function App() {
-  const [guesses, setGuesses] = useState<string[]>([]);
-  const [currentGuess, setCurrentGuess] = useState('');
-  const [gameStatus, setGameStatus] = useState<'playing' | 'won' | 'lost'>('playing');
+type GameStatus = "playing" | "won" | "lost";
+
+interface SavedGame {
+  guesses: string[];
+  gameStatus: GameStatus;
+}
+
+// Keyed by the encoded word so the answer isn't readable in devtools.
+const storageKey = (word: string) => `wordle:${encodeWord(word)}`;
+
+function loadGame(word: string): SavedGame | null {
+  try {
+    const raw = localStorage.getItem(storageKey(word));
+    return raw ? (JSON.parse(raw) as SavedGame) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveGame(word: string, game: SavedGame) {
+  try {
+    localStorage.setItem(storageKey(word), JSON.stringify(game));
+  } catch {
+    // Storage unavailable (e.g. private mode); play continues unsaved.
+  }
+}
+
+interface AppProps {
+  targetWord: string;
+}
+
+function App({ targetWord }: AppProps) {
+  const wordLength = targetWord.length;
+  const [savedGame] = useState(() => loadGame(targetWord));
+  const [guesses, setGuesses] = useState<string[]>(savedGame?.guesses ?? []);
+  const [currentGuess, setCurrentGuess] = useState("");
+  const [gameStatus, setGameStatus] = useState<GameStatus>(
+    savedGame?.gameStatus ?? "playing"
+  );
   const [shake, setShake] = useState(false);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (gameStatus !== 'playing') return;
+    saveGame(targetWord, { guesses, gameStatus });
+  }, [targetWord, guesses, gameStatus]);
 
-      if (e.key === 'Enter') {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameStatus !== "playing") return;
+
+      if (e.key === "Enter") {
         handleSubmitGuess();
-      } else if (e.key === 'Backspace') {
-        setCurrentGuess(prev => prev.slice(0, -1));
-      } else if (/^[a-zA-Z]$/.test(e.key) && currentGuess.length < 5) {
-        setCurrentGuess(prev => (prev + e.key).toUpperCase());
+      } else if (e.key === "Backspace") {
+        setCurrentGuess((prev) => prev.slice(0, -1));
+      } else if (/^[a-zA-Z]$/.test(e.key) && currentGuess.length < wordLength) {
+        setCurrentGuess((prev) => (prev + e.key).toUpperCase());
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentGuess, gameStatus, guesses]);
 
   const handleSubmitGuess = () => {
-    if (currentGuess.length !== 5) {
+    if (currentGuess.length !== wordLength) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
@@ -36,55 +76,55 @@ function App() {
 
     const newGuesses = [...guesses, currentGuess];
     setGuesses(newGuesses);
-    setCurrentGuess('');
+    setCurrentGuess("");
 
-    if (currentGuess === TARGET_WORD) {
-      setGameStatus('won');
-    } else if (newGuesses.length === 6) {
-      setGameStatus('lost');
+    if (currentGuess === targetWord) {
+      setGameStatus("won");
+    } else if (newGuesses.length === MAX_GUESSES) {
+      setGameStatus("lost");
     }
   };
 
   const handleKeyClick = (key: string) => {
-    if (gameStatus !== 'playing') return;
+    if (gameStatus !== "playing") return;
 
-    if (key === 'ENTER') {
+    if (key === "ENTER") {
       handleSubmitGuess();
-    } else if (key === 'BACK') {
-      setCurrentGuess(prev => prev.slice(0, -1));
-    } else if (currentGuess.length < 5) {
-      setCurrentGuess(prev => prev + key);
+    } else if (key === "BACK") {
+      setCurrentGuess((prev) => prev.slice(0, -1));
+    } else if (currentGuess.length < wordLength) {
+      setCurrentGuess((prev) => prev + key);
     }
   };
 
   const getLetterStatus = () => {
-    const status: Record<string, 'correct' | 'present' | 'absent'> = {};
+    const status: Record<string, "correct" | "present" | "absent"> = {};
 
-    guesses.forEach(guess => {
+    guesses.forEach((guess) => {
       const targetLetterCounts: Record<string, number> = {};
-      TARGET_WORD.split('').forEach(letter => {
+      targetWord.split("").forEach((letter) => {
         targetLetterCounts[letter] = (targetLetterCounts[letter] || 0) + 1;
       });
 
       const correctPositions = new Set<number>();
-      guess.split('').forEach((letter, i) => {
-        if (TARGET_WORD[i] === letter) {
+      guess.split("").forEach((letter, i) => {
+        if (targetWord[i] === letter) {
           correctPositions.add(i);
-          status[letter] = 'correct';
+          status[letter] = "correct";
           targetLetterCounts[letter]--;
         }
       });
 
-      guess.split('').forEach((letter, i) => {
+      guess.split("").forEach((letter, i) => {
         if (!correctPositions.has(i)) {
           if (targetLetterCounts[letter] > 0) {
-            if (status[letter] !== 'correct') {
-              status[letter] = 'present';
+            if (status[letter] !== "correct") {
+              status[letter] = "present";
             }
             targetLetterCounts[letter]--;
           } else {
             if (!status[letter]) {
-              status[letter] = 'absent';
+              status[letter] = "absent";
             }
           }
         }
@@ -95,21 +135,24 @@ function App() {
   };
 
   const getGameEndText = () => {
-    if (gameStatus === 'won') {
+    if (gameStatus === "won") {
       return (
         <span className="flex gap-2 align-items-center justify-content-center">
-        <Heart fill="red"/> 
-        <span>Sorry kitten!</span>
-      </span>
-      )
+          <Heart fill="red" />
+          <span>Congratulations!! </span>
+        </span>
+      );
     }
     return (
-      <span className="flex gap-2 align-items-center">
-        <Heart fill="red"/> 
-        <span>Try again baby!</span>
+      <span className="flex flex-col justify-items-center gap-2 align-items-center">
+        <span className="flex gap-3 text-center justify-center">
+          <Skull />
+          <span>Oops... this is embarrassing!</span>
+        </span>
+        <span>Look down in shame! You have left the faithfuls down!</span>
       </span>
-    )
-  }
+    );
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -122,23 +165,19 @@ function App() {
           guesses={guesses}
           currentGuess={currentGuess}
           shake={shake}
+          targetWord={targetWord}
         />
 
-        {gameStatus !== 'playing' && (
+        {gameStatus !== "playing" && (
           <div className="text-center mb-4">
-            <p className="text-2xl font-bold mb-2">
-              {getGameEndText()}
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-green-600 text-white rounded-md font-semibold hover:bg-green-700 transition-colors"
-            >
-              Play Again
-            </button>
+            <p className="text-2xl font-bold mb-2">{getGameEndText()}</p>
           </div>
         )}
 
-        <Keyboard onKeyClick={handleKeyClick} letterStatus={getLetterStatus()} />
+        <Keyboard
+          onKeyClick={handleKeyClick}
+          letterStatus={getLetterStatus()}
+        />
       </main>
     </div>
   );

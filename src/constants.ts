@@ -1,3 +1,2 @@
-export const TARGET_WORD = 'SORRY';
+export const DEFAULT_WORD = "ALICE";
 export const MAX_GUESSES = 6;
-export const WORD_LENGTH = 5;
